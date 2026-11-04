@@ -1,0 +1,36 @@
+name: Isolation probe
+
+# Daily: checks row-level security for real on staging and production, as app_probe (a login
+# role that can only read camp tables, under row-level security like the Workers' roles).
+# The platform's hourly health check runs the same checks as app_platform. A failure here is
+# an incident: see "Incidents" in docs/operating.md. GitHub emails the repository's owner when a
+# scheduled run fails.
+on:
+  schedule:
+    - cron: "37 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [staging, production]
+    # production-jobs in the canonical repository, as in backup.yml.
+    environment: ${{ matrix.env == 'production' && github.repository == 'themecampapp/themecampapp' && 'production-jobs' || matrix.env }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Probe
+        env:
+          # app_probe's connection string (never the owner's: the probe refuses a role that skips
+          # row-level security). Until it's set in an environment, that one is skipped.
+          PROBE_DATABASE_URL: ${{ secrets.PROBE_DATABASE_URL }}
+          PROBE_CAMP_ID: ${{ vars.PROBE_CAMP_ID }}
+        run: |
+          if [ -z "$PROBE_DATABASE_URL" ]; then
+            echo "::notice::PROBE_DATABASE_URL isn't set for ${{ matrix.env }}; skipped (docs/operating.md, Alerts)"
+            exit 0
+          fi
+          npm run probe:isolation

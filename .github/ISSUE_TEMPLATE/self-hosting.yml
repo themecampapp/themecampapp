@@ -1,0 +1,31 @@
+name: Self-hosting help
+description: Stuck setting up or running your own instance.
+labels: [self-hosting]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        docs/self-hosting.md and docs/operating.md cover most of it. Never paste secrets, API keys or connection strings here.
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where you're stuck
+      description: Which step of docs/self-hosting.md, what you ran, and what it said (with secrets removed).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Your instance
+      options:
+        - One camp (singleCamp)
+        - Many camps
+  - type: input
+    id: database
+    attributes:
+      label: Database host and Postgres version
+      placeholder: Neon, Postgres 18

@@ -1,0 +1,21 @@
+name: Feature idea
+description: Something camps need that the app doesn't do yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is your camp trying to do, and what gets in the way today? Start here, before any solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: An idea for solving it
+      description: Optional. How you picture it working.
+  - type: textarea
+    id: who
+    attributes:
+      label: Who it's for
+      description: Leads, Treasurers, Admins, every member? Roughly how big is your camp?

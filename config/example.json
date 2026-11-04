@@ -1,0 +1,46 @@
+{
+  "$comment": "A template for your own instance: copy it to config/<yours>.json and replace every value. See docs/self-hosting.md. Nothing in this file is a secret.",
+  "wranglerEnv": null,
+  "domain": "camps.example.org",
+  "workers": { "camps": "camps", "platform": "camps-platform" },
+  "hyperdrive": {
+    "camps": "<the camp Worker's Hyperdrive id>",
+    "platform": "<the platform Worker's Hyperdrive id>"
+  },
+  "bucket": "camps-files",
+  "placementRegion": "aws:us-east-1",
+  "rateLimits": { "join": "1001", "signup": "1002" },
+  "turnstile": {
+    "camps": "<the join pages' Turnstile site key>",
+    "signup": "<the sign-up page's Turnstile site key>"
+  },
+  "access": null,
+  "crons": { "camps": "0 16 * * *", "platform": "7 * * * *" },
+  "mail": {
+    "provider": "postmark",
+    "from": "notify@mail.camps.example.org",
+    "authFrom": "signin@auth.camps.example.org",
+    "alertFrom": "notify@mail.camps.example.org",
+    "restricted": false
+  },
+  "product": {
+    "name": "Example Camps",
+    "operator": "Example Org",
+    "contactEmail": "hello@camps.example.org",
+    "supportUrl": null,
+    "sourceUrl": "https://github.com/themecampapp/themecampapp",
+    "reservedSlugs": ["examplecamps", "example-camps"],
+    "reservedParts": ["examplecamps"],
+    "icon": "default"
+  },
+  "features": {
+    "signupPage": false,
+    "console": false,
+    "feedback": false,
+    "usage": false,
+    "discord": false
+  },
+  "legal": { "dir": "templates", "pilotAgreement": false },
+  "singleCamp": null,
+  "database": { "snapshot": "dump" }
+}

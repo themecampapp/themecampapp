@@ -1,0 +1,25 @@
+# Dependency updates (open-source plan 5.3): weekly, grouped so a week's minor and patch
+# updates arrive as one pull request. Major versions come one at a time, since they're the ones
+# that break things. Each runs the full CI like any pull request.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # Node's types follow the Node the scripts and CI run on (22, .github/actions/setup):
+      # newer ones would typecheck code that crashes on 22. Move both together.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

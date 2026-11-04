@@ -1,0 +1,1 @@
+ALTER TABLE "camp_settings" ADD COLUMN "community_joined_at" timestamp with time zone;

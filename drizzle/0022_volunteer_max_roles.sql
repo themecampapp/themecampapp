@@ -1,0 +1,2 @@
+ALTER TABLE "camp_settings" ADD COLUMN "volunteer_max_roles" integer;--> statement-breakpoint
+ALTER TABLE "camp_settings" ADD CONSTRAINT "camp_settings_volunteer_max_ck" CHECK ("camp_settings"."volunteer_max_roles" is null or "camp_settings"."volunteer_max_roles" between 1 and 20);

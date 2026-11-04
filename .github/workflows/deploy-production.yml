@@ -1,0 +1,128 @@
+name: Deploy production
+
+# Manual: run it from the Actions tab, after the same commit is green on staging. It deploys
+# only a commit whose CI / Staging run on main (typecheck, lint, the full test suite and the
+# staging deploy) succeeded, so the tests aren't run a second time here.
+# Which ref (open-source plan 9.1): the canonical repository deploys the hosted service from a
+# release tag (v1.2.0) only. Anywhere else (a self-hosted fork) it deploys main, and only once
+# the repository variable DEPLOY_INSTANCE names the fork's own config, so a fork never tries
+# the hosted service's.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # The instance this deploys, config/<name>.json: the repository variable DEPLOY_INSTANCE
+      # (a self-hosted fork's own config, open-source plan 4.4), or the hosted service's.
+      INSTANCE: ${{ vars.DEPLOY_INSTANCE || 'hosted' }}
+    # Reading other workflows' runs (the gate below) needs actions: read.
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check this repository may deploy this ref
+        env:
+          DEPLOY_INSTANCE: ${{ vars.DEPLOY_INSTANCE }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REPOSITORY" = themecampapp/themecampapp ]; then
+            case "$GITHUB_REF" in
+              refs/tags/v*) echo "Deploying the release $GITHUB_REF_NAME." ;;
+              *) echo "::error::The hosted service deploys release tags only. Run this on a tag (v1.2.0), not $GITHUB_REF_NAME."; exit 1 ;;
+            esac
+          else
+            if [ -z "$DEPLOY_INSTANCE" ]; then
+              echo "::error::Set the repository variable DEPLOY_INSTANCE to your instance's config name (docs/self-hosting.md, step 11)."
+              exit 1
+            fi
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::Deploy from main, not $GITHUB_REF_NAME."
+              exit 1
+            fi
+          fi
+      - name: Require a green CI / Staging run for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" \
+            --event push --branch main --json status,conclusion,url --limit 5)
+          echo "$runs"
+          if echo "$runs" | jq -e 'any(.[]; .status == "completed" and .conclusion == "success")' >/dev/null; then
+            echo "CI / Staging passed for ${GITHUB_SHA::12}: typecheck, lint, tests and the staging deploy."
+          elif echo "$runs" | jq -e 'any(.[]; .status != "completed")' >/dev/null; then
+            echo "::error::CI / Staging is still running for ${GITHUB_SHA::12}. Deploy once it's green."
+            exit 1
+          else
+            echo "::error::No successful CI / Staging run for ${GITHUB_SHA::12}. Fix it on staging first."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The instance config's database.snapshot says how (open-source plan 3.2): a Neon branch,
+      # an encrypted pg_dump kept as an artifact (any Postgres), or none.
+      - name: Read how to snapshot the database
+        id: snapshot
+        run: |
+          kind=$(node -p 'require(`./config/${process.env.INSTANCE}.json`).database?.snapshot')
+          case "$kind" in neon | dump | none) ;; *) echo "::error::database.snapshot is '$kind'"; exit 1 ;; esac
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+      - name: Snapshot the production database (pre-migration Neon branch)
+        if: steps.snapshot.outputs.kind == 'neon'
+        run: scripts/neon-snapshot.sh "${GITHUB_SHA::12}"
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      - id: pg
+        if: steps.snapshot.outputs.kind == 'dump'
+        uses: ./.github/actions/pg-client
+      - name: Snapshot the production database (pre-migration dump)
+        if: steps.snapshot.outputs.kind == 'dump'
+        run: scripts/db-dump.sh "pre-migration-${GITHUB_SHA::12}.dump.age"
+        env:
+          PG_BIN: ${{ steps.pg.outputs.bin }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+      - if: steps.snapshot.outputs.kind == 'dump'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pre-migration-${{ github.sha }}
+          path: pre-migration-*.dump.age
+          retention-days: 30
+          if-no-files-found: error
+      - name: Apply migrations
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Apply and check database grants and row-level security
+        run: npm run db:grants
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Generate the instance's Wrangler configs
+        run: npx tsx scripts/config-to-wrangler.ts --out-dir . "$INSTANCE"
+      - name: Build both Workers
+        run: npm run build
+      - name: Check the build targets the instance
+        run: npx tsx scripts/check-deploy-target.ts "$INSTANCE"
+      - name: Deploy the camp Worker
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy the platform Worker
+        working-directory: platform
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

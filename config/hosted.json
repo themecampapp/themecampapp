@@ -1,0 +1,46 @@
+{
+  "$comment": "The hosted service at themecamp.app (production). Identifiers only; secrets live in Worker secrets and GitHub environments.",
+  "wranglerEnv": null,
+  "domain": "themecamp.app",
+  "workers": { "camps": "tca-camps", "platform": "tca-platform" },
+  "hyperdrive": {
+    "camps": "dea8a955eb294c4397cd0673ae0651aa",
+    "platform": "85789a0a02734327b683760d3e7c5e5a"
+  },
+  "bucket": "tca-files",
+  "placementRegion": "aws:us-west-2",
+  "rateLimits": { "join": "2001", "signup": "2003" },
+  "turnstile": { "camps": "0x4AAAAAAFLcDRFwD8OBdemo", "signup": "0x4AAAAAAFNt4BBWNcsg_k24" },
+  "access": {
+    "teamDomain": "https://rr0dev.cloudflareaccess.com",
+    "aud": "d0a521cb05e09becd9b1335a93b7324fb8c72fdcfff2ea8a57cf0c1fb0948a47"
+  },
+  "crons": { "camps": "0 16 * * *", "platform": "7 * * * *" },
+  "mail": {
+    "provider": "plunk",
+    "from": "notify@mail.themecamp.app",
+    "authFrom": "signin@auth.themecamp.app",
+    "alertFrom": "notify@mail.themecamp.app",
+    "restricted": false
+  },
+  "product": {
+    "name": "Theme Camp App",
+    "operator": "Kline Technology LLC",
+    "contactEmail": "hello@themecamp.app",
+    "supportUrl": "https://discord.gg/R49HBkM8u",
+    "sourceUrl": "https://github.com/themecampapp/themecampapp",
+    "reservedSlugs": ["themecamp", "theme-camp", "themecampapp", "tca"],
+    "reservedParts": ["themecampapp", "theme-camp-app"],
+    "icon": "hosted"
+  },
+  "features": {
+    "signupPage": true,
+    "console": true,
+    "feedback": true,
+    "usage": true,
+    "discord": true
+  },
+  "legal": { "dir": "hosted", "pilotAgreement": true },
+  "singleCamp": null,
+  "database": { "snapshot": "neon" }
+}

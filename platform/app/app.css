@@ -1,0 +1,20 @@
+/* SPDX-FileCopyrightText: 2026 Curtis Kline and contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+@import "tailwindcss" source(".");
+
+/* The legal pages' Markdown (legal/<dir>), like the camp app's guides. */
+.legal h2 {
+  @apply mt-6 mb-2 text-lg font-semibold;
+}
+.legal p {
+  @apply my-3 leading-relaxed;
+}
+.legal ul {
+  @apply my-3 list-disc space-y-1 pl-6;
+}
+.legal a {
+  @apply font-semibold underline;
+}
+.legal strong {
+  @apply font-semibold;
+}

@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.cloudflare.json",
+  "include": [
+    ".react-router/types/**/*",
+    "app/**/*",
+    "scripts/**/*",
+    "config/**/*",
+    "tests/**/*",
+    "platform/app/jobs/health.server.ts",
+    "platform/app/jobs/run.server.ts",
+    "platform/app/jobs/support-grants.server.ts",
+    "platform/app/lib/alerts.server.ts",
+    "platform/app/lib/feedback.server.ts",
+    "platform/app/lib/usage.server.ts",
+    "platform/app/lib/access-jwt.server.ts",
+    "platform/app/lib/isolation.server.ts",
+    "platform/app/lib/mail.server.ts",
+    "platform/app/lib/sending-health.server.ts",
+    "platform/app/lib/suppression.server.ts",
+    "platform/app/lib/signup.server.ts",
+    "platform/app/lib/camps.server.ts",
+    "platform/app/lib/console.server.ts",
+    "platform/app/lib/context.server.ts",
+    "platform/app/lib/signup.ts",
+    "platform/app/webhooks/email.server.ts",
+    "vitest.config.ts",
+    "drizzle.config.ts",
+    "worker-configuration.d.ts"
+  ],
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.scripts.tsbuildinfo"
+  }
+}

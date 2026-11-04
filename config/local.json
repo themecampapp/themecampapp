@@ -1,0 +1,43 @@
+{
+  "$comment": "Local development (camps at <slug>.localhost) and the tests. Nothing here reaches a real account: Hyperdrive uses its local connection string, and tests stub outbound mail.",
+  "wranglerEnv": null,
+  "domain": "localhost",
+  "workers": { "camps": "tca-camps-local", "platform": "tca-platform-local" },
+  "hyperdrive": {
+    "camps": "00000000000000000000000000000001",
+    "platform": "00000000000000000000000000000002"
+  },
+  "bucket": "tca-files-local",
+  "placementRegion": "aws:us-west-2",
+  "rateLimits": { "join": "9001", "signup": "9002" },
+  "turnstile": { "camps": "1x00000000000000000000AA", "signup": "1x00000000000000000000AA" },
+  "access": null,
+  "crons": { "camps": "0 16 * * *", "platform": "7 * * * *" },
+  "mail": {
+    "provider": "plunk",
+    "from": "notify@mail.localhost",
+    "authFrom": "signin@auth.localhost",
+    "alertFrom": "notify@mail.localhost",
+    "restricted": false
+  },
+  "product": {
+    "name": "Theme Camp App",
+    "operator": "Kline Technology LLC",
+    "contactEmail": "hello@example.com",
+    "supportUrl": null,
+    "sourceUrl": "https://github.com/themecampapp/themecampapp",
+    "reservedSlugs": ["themecamp", "theme-camp", "themecampapp", "tca"],
+    "reservedParts": ["themecampapp", "theme-camp-app"],
+    "icon": "hosted"
+  },
+  "features": {
+    "signupPage": true,
+    "console": true,
+    "feedback": true,
+    "usage": true,
+    "discord": true
+  },
+  "legal": { "dir": "hosted", "pilotAgreement": true },
+  "singleCamp": null,
+  "database": { "snapshot": "none" }
+}

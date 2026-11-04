@@ -1,0 +1,23 @@
+name: PostgreSQL client and age
+description: pg_dump and psql from the PostgreSQL apt repository, and age, for scripts/db-dump.sh.
+inputs:
+  major:
+    description: The client's major version. It must be at least the server's, so the newest the app supports.
+    default: "18"
+outputs:
+  bin:
+    description: The folder with pg_dump and psql (PG_BIN for scripts/db-dump.sh).
+    value: ${{ steps.bin.outputs.bin }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq "postgresql-client-${{ inputs.major }}" age
+    - id: bin
+      shell: bash
+      run: echo "bin=/usr/lib/postgresql/${{ inputs.major }}/bin" >> "$GITHUB_OUTPUT"

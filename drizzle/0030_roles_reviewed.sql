@@ -1,0 +1,1 @@
+ALTER TABLE "camp_settings" ADD COLUMN "roles_reviewed_at" timestamp with time zone;

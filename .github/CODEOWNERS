@@ -1,0 +1,32 @@
+# The areas that hold the boundary between camps, sign-in, data rights and the hosted service's
+# own settings (CONTRIBUTING.md, "Areas that need extra care"; open-source plan 5.3). With branch
+# protection's "Require review from Code Owners" on, a change to any of them needs the
+# maintainer's review.
+
+# Camp isolation: the scoped client, the database roles and grants, migrations, and the tests
+# that prove it.
+/app/lib/tenancy.server.ts          @curtiskline
+/app/lib/db.server.ts               @curtiskline
+/drizzle/                           @curtiskline
+/app/db/schema.ts                   @curtiskline
+/scripts/db-*.ts                    @curtiskline
+/tests/db/                          @curtiskline
+/tests/tenancy/                     @curtiskline
+/tests/authz/                       @curtiskline
+
+# Sign-in and access.
+/app/lib/auth*.ts                   @curtiskline
+/app/lib/access.server.ts           @curtiskline
+/app/lib/permissions.ts             @curtiskline
+
+# Data rights and deletion: the platform Worker (console, data requests, webhooks) and leaving
+# a camp.
+/platform/                          @curtiskline
+/app/lib/leave-camp.server.ts       @curtiskline
+
+# The hosted service's own settings, legal pages and deploys.
+/.github/                           @curtiskline
+/config/                            @curtiskline
+/legal/                             @curtiskline
+/scripts/check-deploy-target.ts     @curtiskline
+/scripts/config-to-wrangler.ts      @curtiskline

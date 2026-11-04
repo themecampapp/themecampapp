@@ -1,0 +1,46 @@
+{
+  "$comment": "The hosted service's staging copy at themecamp.dev: fictional data only. Its list of who may get mail is a staging Worker secret, never committed.",
+  "wranglerEnv": "staging",
+  "domain": "themecamp.dev",
+  "workers": { "camps": "tca-camps-staging", "platform": "tca-platform-staging" },
+  "hyperdrive": {
+    "camps": "bbb0df23a009473981371f2dc98d6121",
+    "platform": "b37cfae09527476684f5fbda5795035e"
+  },
+  "bucket": "tca-files-staging",
+  "placementRegion": "aws:us-west-2",
+  "rateLimits": { "join": "2002", "signup": "2004" },
+  "turnstile": { "camps": "0x4AAAAAAFLcDuzZ44XMtG56", "signup": "0x4AAAAAAFLcDuzZ44XMtG56" },
+  "access": {
+    "teamDomain": "https://rr0dev.cloudflareaccess.com",
+    "aud": "54ad05185fabb6d793cfd19ffa20f12f0c7e7bb5e236a4730c216a3c233629b5"
+  },
+  "crons": { "camps": "0 16 * * *", "platform": "7 * * * *" },
+  "mail": {
+    "provider": "plunk",
+    "from": "notify@mail.themecamp.dev",
+    "authFrom": "signin@auth.themecamp.dev",
+    "alertFrom": "notify@mail.themecamp.dev",
+    "restricted": true
+  },
+  "product": {
+    "name": "Theme Camp App",
+    "operator": "Kline Technology LLC",
+    "contactEmail": "hello@themecamp.dev",
+    "supportUrl": "https://discord.gg/R49HBkM8u",
+    "sourceUrl": "https://github.com/themecampapp/themecampapp",
+    "reservedSlugs": ["themecamp", "theme-camp", "themecampapp", "tca"],
+    "reservedParts": ["themecampapp", "theme-camp-app"],
+    "icon": "hosted"
+  },
+  "features": {
+    "signupPage": true,
+    "console": true,
+    "feedback": true,
+    "usage": true,
+    "discord": true
+  },
+  "legal": { "dir": "hosted", "pilotAgreement": true },
+  "singleCamp": null,
+  "database": { "snapshot": "none" }
+}

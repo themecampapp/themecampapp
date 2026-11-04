@@ -1,0 +1,33 @@
+# Private camp data — never commit
+*.xlsx
+*.xls
+*.csv
+import-output/
+*.dump
+*.sql.gz
+*.age
+
+# Secrets
+*.key
+*.pem
+.dev.vars*
+.env*
+!.env.example
+
+# Build / deps
+node_modules/
+build/
+.react-router/
+.wrangler/
+dist/
+coverage/
+.DS_Store
+
+# Cloudflare / RR
+*.tsbuildinfo
+.mf
+worker-configuration.d.ts
+# Generated from config/*.json by scripts/config-to-wrangler.ts (npm run config:local / config:hosted)
+/wrangler.jsonc
+/platform/wrangler.jsonc
+!.dev.vars.example

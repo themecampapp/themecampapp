@@ -1,0 +1,39 @@
+name: Backup
+
+# Daily encrypted pg_dump (scripts/db-dump.sh), kept away from the database host as a 90-day
+# workflow artifact (see docs/operating.md).
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    # Off until production holds data and the secrets exist: set the repository variable
+    # BACKUPS_ENABLED=true (see "Snapshots, backups and restores" in docs/operating.md).
+    if: vars.BACKUPS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # The canonical repository's production environment allows only release tags and needs the
+    # operator's approval (open-source plan 9.1), so its scheduled jobs use production-jobs: main
+    # only, no approval, and just the secrets they need. A fork keeps using production.
+    environment: ${{ github.repository == 'themecampapp/themecampapp' && 'production-jobs' || 'production' }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: pg
+        uses: ./.github/actions/pg-client
+      - name: Dump and encrypt
+        run: |
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%dT%H%MZ)
+          scripts/db-dump.sh "tca-${stamp}.dump.age"
+          echo "STAMP=${stamp}" >> "$GITHUB_ENV"
+        env:
+          PG_BIN: ${{ steps.pg.outputs.bin }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tca-backup-${{ env.STAMP }}
+          path: tca-*.dump.age
+          retention-days: 90
+          if-no-files-found: error

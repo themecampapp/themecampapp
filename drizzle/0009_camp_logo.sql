@@ -1,0 +1,1 @@
+ALTER TABLE "camp_settings" ADD COLUMN "logo_key" text;

@@ -1,0 +1,199 @@
+name: CI / Staging
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: staging-${{ github.ref }}
+  cancel-in-progress: false
+
+# Where the jobs run. main (its CI and the staging deploy) always runs on GitHub's runners.
+# Everything else (pull requests from feature and bugfix branches) runs on the self-hosted
+# runner whose label is in the repository variable CI_RUNNER (e.g. "unraid"), or on GitHub's
+# when it's unset. One self-hosted runner takes one job at a time, so the shards queue.
+# Never point CI_RUNNER at a self-hosted runner once the repository is public: pull requests
+# from anyone's fork would run code on that machine. The canonical repository ignores it, so
+# setting it there by mistake does nothing (open-source plan 5.3).
+
+jobs:
+  # Typecheck and lint, alongside the tests.
+  static:
+    runs-on: ${{ github.repository != 'themecampapp/themecampapp' && github.ref != 'refs/heads/main' && vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: npm run typecheck
+      - run: npm run lint
+
+  # The suite, split across three runners (2 cores each). Each shard builds both Workers once
+  # (tests/setup/build.ts) and runs its files against its own Postgres.
+  test:
+    runs-on: ${{ github.repository != 'themecampapp/themecampapp' && github.ref != 'refs/heads/main' && vars.CI_RUNNER || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+        include:
+          # The tests that send or receive email again, with Postmark as the provider (open-source
+          # plan 3.1; the shards use Plunk, the hosted service's).
+          - shard: postmark
+    env:
+      # Its own container per job, on a port Docker picks: a self-hosted runner's machine may
+      # have other containers, an earlier job's leftovers, or a Postgres of its own on 5432.
+      PG: tca-ci-pg-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v7
+      # Match Neon (PostgreSQL 18). Started first so it boots while dependencies install. Its
+      # data is thrown away, so it skips the durability work (fsync) that slows CREATE DATABASE.
+      - name: Start Postgres
+        run: |
+          docker run -d --name "$PG" -p 127.0.0.1::5432 \
+            -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test \
+            postgres:18-alpine \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+          port=$(docker port "$PG" 5432/tcp | head -1 | sed 's/.*://')
+          echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:${port}/test" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            docker exec "$PG" pg_isready -U test -h 127.0.0.1 && exit 0
+            sleep 1
+          done
+          docker logs "$PG"; exit 1
+      - if: matrix.shard != 'postmark'
+        run: npx vitest run --shard=${{ matrix.shard }}/3
+      - if: matrix.shard == 'postmark'
+        run: npm run test:postmark
+      - name: Remove Postgres
+        if: always()
+        run: docker rm -f "$PG" >/dev/null 2>&1 || true
+
+  # Plain Postgres, each version the app supports (open-source plan 3.2): the superuser-free
+  # setup a self-hoster follows, a backup and restore round trip, and the database and isolation
+  # tests. The full suite runs above on 18, Neon's version.
+  postgres:
+    # GitHub's runners: installing the PostgreSQL client needs sudo and apt.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [16, 17, 18]
+    env:
+      PG: tca-ci-pg-${{ github.run_id }}-${{ github.run_attempt }}-pg${{ matrix.pg }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start Postgres ${{ matrix.pg }}
+        run: |
+          docker run -d --name "$PG" -p 127.0.0.1::5432 \
+            -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test \
+            postgres:${{ matrix.pg }}-alpine \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+          port=$(docker port "$PG" 5432/tcp | head -1 | sed 's/.*://')
+          echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:${port}/test" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup
+      - id: pg
+        uses: ./.github/actions/pg-client
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            docker exec "$PG" pg_isready -U test -h 127.0.0.1 && exit 0
+            sleep 1
+          done
+          docker logs "$PG"; exit 1
+      # First, while the cluster is fresh: the owner must be the one that creates the app's roles.
+      - name: Set up as a non-superuser owner, back up and restore
+        run: scripts/plain-postgres-check.sh
+        env:
+          ADMIN_URL: ${{ env.TEST_DATABASE_URL }}
+          PG_BIN: ${{ steps.pg.outputs.bin }}
+      - run: npx vitest run tests/db tests/tenancy
+      - name: Remove Postgres
+        if: always()
+        run: docker rm -f "$PG" >/dev/null 2>&1 || true
+
+  # One required check for branch protection, whatever the matrix looks like.
+  check:
+    needs: [static, test, postgres]
+    if: always()
+    runs-on: ${{ github.repository != 'themecampapp/themecampapp' && github.ref != 'refs/heads/main' && vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - run: |
+          [ "${{ needs.static.result }}" = success ] && [ "${{ needs.test.result }}" = success ] \
+            && [ "${{ needs.postgres.result }}" = success ]
+
+  deploy-staging:
+    # Every change runs on staging (themecamp.dev, fictional data) before production.
+    # Production is deployed by hand with the "Deploy production" workflow.
+    needs: check
+    # STAGING_INSTANCE=none: an instance with no staging copy (open-source plan 4.4). Outside the
+    # canonical repository, it deploys only once both DEPLOY_INSTANCE and STAGING_INSTANCE are
+    # set (open-source plan 9.1), so a fork's CI never tries the hosted service's staging.
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      vars.STAGING_INSTANCE != 'none' &&
+      (github.repository == 'themecampapp/themecampapp' ||
+      (vars.DEPLOY_INSTANCE != '' && vars.STAGING_INSTANCE != ''))
+    # Only ever main, so always GitHub's runners (staging's secrets never reach the
+    # self-hosted machine).
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      # The instances, config/<name>.json: the repository variables DEPLOY_INSTANCE and
+      # STAGING_INSTANCE (a self-hosted fork's own, open-source plan 4.4), or the hosted service's.
+      INSTANCE: ${{ vars.DEPLOY_INSTANCE || 'hosted' }}
+      STAGING: ${{ vars.STAGING_INSTANCE || 'staging' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # Staging holds only fictional data, so no snapshot first.
+      - name: Apply migrations
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Apply and check database grants and row-level security
+        run: npm run db:grants
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # A staging config that names a Wrangler environment (the hosted service's) is generated
+      # alongside the production one and built as that environment; one without is on its own.
+      - name: Generate the staging instance's Wrangler configs
+        run: |
+          set -euo pipefail
+          wenv=$(node -p 'require(`./config/${process.env.STAGING}.json`).wranglerEnv ?? ""')
+          if [ -n "$wenv" ]; then
+            npx tsx scripts/config-to-wrangler.ts --out-dir . "$INSTANCE" "$STAGING"
+            echo "CLOUDFLARE_ENV=$wenv" >> "$GITHUB_ENV"
+          else
+            npx tsx scripts/config-to-wrangler.ts --out-dir . "$STAGING"
+          fi
+      - name: Build both Workers for staging
+        run: npm run build
+      - name: Check the build targets staging
+        run: npx tsx scripts/check-deploy-target.ts "$STAGING"
+      - name: Deploy the camp Worker
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy the platform Worker
+        working-directory: platform
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # The domain and product name come from the staging config (open-source plan 2.5).
+      - name: Check staging answers
+        run: |
+          set -euo pipefail
+          domain=$(node -p 'require(`./config/${process.env.STAGING}.json`).domain')
+          name=$(node -p 'require(`./config/${process.env.STAGING}.json`).product.name')
+          for i in $(seq 1 10); do
+            if curl -fsS "https://$domain/" | grep -qF "$name"; then exit 0; fi
+            sleep 3
+          done
+          echo "::error::https://$domain/ didn't serve the platform page"
+          exit 1

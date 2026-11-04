@@ -1,0 +1,27 @@
+name: Set up Node and dependencies
+description: Node 22 and node_modules, restored from cache when package-lock.json hasn't changed.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+    # node_modules itself is cached (not just npm's download cache): npm ci's reinstall of
+    # workerd, sharp and esbuild was ~20 s per job.
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        # Per kind of runner too: a self-hosted machine's native binaries (workerd, sharp) may not
+        # match GitHub's.
+        key: node-modules-${{ runner.environment }}-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+    # On a hit, npm ci's postinstall (the Workers' generated types) is skipped; the typecheck
+    # script regenerates those itself, and nothing else needs them.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci
+    # The Wrangler configs are generated from config/*.json (open-source plan, Unit 2.2). npm
+    # ci's postinstall writes the local instance's, but a cache hit skips it, so always do it.
+    # Deploy jobs regenerate from the hosted service's configs before building.
+    - shell: bash
+      run: npm run config:local
